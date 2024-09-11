@@ -1,10 +1,10 @@
 # NMF-for-Identification-of-Human-Disease-Associated-Gene-Module
- NMF for Identification of Human Disease-Associated Gene Modules through Multi-label Classification
+# NMF for Identification of Human Disease-Associated Gene Modules through Multi-label Classification
  #find unique gene 
-#load all_gene dataset And intersect(using MATLAB)
+# load all_gene dataset And intersect(using MATLAB)
  [a,b] = find(ismember(allgenedata,unique_ppi));
  result=x([a],:);
- #in R studio, create a semantic similarity matrix.
+ # in R studio, create a semantic similarity matrix.
  install.packages(csgl.go);
  library("csbl.go"); 
 set.prob.table(organism=9606 , type="similarity")
@@ -13,14 +13,14 @@ matrix<-entity.sim.many(ent,"BP","Relevance")
 write.table(matrix,"simantic_sim_matrix_nonprogressor",sep="\t")
 # After that find the top gene sets using the quantile function.
 quantile(sim_mat,c(0.75,0.85,0.95),na.rm = TRUE)
-#create an adjacency matrix using the PPI dataset and the semantic similarity matrix using GO_dataset.
-#find optimal number of cluster using silhouette method(for both GO and PPI dataset)
+#create an adjacency matrix using the PPI dataset and the semantic similarity matrix using GO_dataset.(Adj_mat.m)
+# find optimal number of cluster using silhouette method(for both GO and PPI dataset)
 library(factoextra)
 fviz_nbclust(sim_matrix, kmeans, method = "silhouette")+
       labs(subtitle = "Silhouette method")
 fviz_nbclust(adj_matrix, kmeans, method = "silhouette")+
       labs(subtitle = "Silhouette method")
-#The two networks (PPI Network and semantic similarity network) are partitioned using a simple k-means clustering.
+# The two networks (PPI Network and semantic similarity network) are partitioned using a simple k-means clustering.
 sim_matrix_cluster=kmeans(sim_matrix,centers = 6,nstart = 25)
 adj_matrix_cluster=kmeans(adj_matrix,centers = 4,nstart = 25)
 #The two categories of modules are then integrated by using a matrix factorization-based framework.
@@ -33,8 +33,8 @@ for (i in 1:7){
       cluster[[i]]=gene_name[which(predict(res)==i)]
 }
 
-#Calculate Z − Score of each meta module mi and for each disease class dj as : Z Scoremi,dj = (Gmi,dj − Emi )/SQRT(Emi ) ,
-#based on Z_score create a plot using ggplot2 package 
+# Calculate Z − Score of each meta module mi and for each disease class dj as : Z Scoremi,dj = (Gmi,dj − Emi )/SQRT(Emi ) ,
+# based on Z_score create a plot using ggplot2 package 
 library(reshape)
 library(ggplot2)
 z_score.new=melt(final_module_Z_score);
@@ -46,6 +46,7 @@ ggplot(z_score.new, aes(Disease_class, Z_score, ymin = 0,ymax = z_score.new)) + 
 ggsave(filename = "zscore.png",height=700,width=500,units = "in");
 #Now a threshold is selected to label a meta module to one of the disease classes.
 #For example,meta-module-2 is predicted to be included in seven of the disease classes (Neurological, Ophthalmological, Skeletal, #Cardiovascular, Cancer, and Endocrine)
+# Heatmap of meta-modules;
 #Figure 3, shows a heatmap representing the membership of the meta-modules within each of the disease classes.
 library(RColorBrewer) 
 library(ComplexHeatmap)
@@ -63,9 +64,8 @@ ht <- Heatmap(
      column_dend_height = unit(4, "cm"),
      rect_gp = gpar(col = "white", lwd = 0.5)
      )
-
-    #The labeled network was then trained using multi-label classification, here we used Utiml packages for ML classification.
-    install.packages("utiml")
+# The labeled network was then trained using multi-label classification, here we used Utiml packages for ML classification.
+install.packages("utiml")
 library("utiml")
 library(mldr)
 ##for SVM learner
@@ -92,47 +92,36 @@ mymldr <- mldr_from_dataframe(my_data, labelIndices = c(1,2,3,4,5,6,7,8,9,10,11,
 ds <- create_holdout_partition(mymldr, c(train=0.65, test=0.35))
 
 
-#1. Using SVM method
+# Using SVM method
 
-# Create a Binary Relevance Model using e1071::svm method
+#Create a Binary Relevance Model using the e1071::SVM method
 brmodel <- br(ds$train, "SVM", seed=123)
-# Predict
 prediction <- predict(brmodel, ds$test)
 prediction
 
-# Show the predictions
 head(as.bipartition(prediction))
 head(as.ranking(prediction))
-# Apply a threshold
 newpred <- rcut_threshold(prediction, 2)
-# Evaluate the models
 result <- multilabel_evaluate(ds$tes, prediction, "bipartition")
 thresres <- multilabel_evaluate(ds$tes, newpred, "bipartition")
-# Print the result
 print(round(cbind(Default=result, RCUT=thresres), 3))
 my_result=cbind(result,thresres)
 library("csv")
 write.csv(my_result,"my_result.csv")
 
-#using randomForest()
+# Using RandomForest method
 
-# Create three partitions (train, val, test) of emotions dataset
+#Create three partitions (train, val, test) of emotions dataset
 partitions <- c(train = 0.6, val = 0.2, test = 0.2)
 ds <- create_holdout_partition(mymldr, partitions, method="iterative")
 
-# Create an Ensemble of Classifier Chains using Random Forest (randomForest package)
+#Create an Ensemble of Classifier Chains using Random Forest (randomForest package)
 eccmodel <- ecc(ds$train, "RF", m=3, cores=parallel::detectCores(), seed=123)
-
-# Predict
 val <- predict(eccmodel, ds$val, cores=parallel::detectCores())
 test <- predict(eccmodel, ds$test, cores=parallel::detectCores())
-
-# Apply a threshold
 thresholds <- scut_threshold(val, ds$val, cores=parallel::detectCores())
 new.val <- fixed_threshold(val, thresholds)
 new.test <- fixed_threshold(test, thresholds)
-
-# Evaluate the models
 measures <- c("subset-accuracy", "F1", "hamming-loss", "macro-based") 
 
 result <- cbind(
@@ -145,7 +134,7 @@ result <- cbind(
 print(round(result, 3))
 write.csv(result,"my_result_randomForest.csv")
 
-#KNN classifier
+# KNN classifier
 partitions <- c(train=0.7, test=0.2, val=0.1)
 strat <- create_holdout_partition(mymldr, partitions, "iterative")
 #Using KNN with k = 5 and changing ECC parameters
@@ -155,7 +144,7 @@ test <- predict(model1, strat$test)
 thresholds <- scut_threshold(val, strat$val)
 new.val <- fixed_threshold(val, thresholds)
 new.test <- fixed_threshold(test, thresholds)
-# Evaluate the models
+
 measures <- c("subset-accuracy", "F1", "hamming-loss", "macro-based")
 result <- cbind(
   Test = multilabel_evaluate(strat$tes, test, measures),
@@ -166,7 +155,7 @@ result <- cbind(
 write.csv(result,"my_result_knn.csv")
 
 
-#Decision tree classifier
+# Decision tree classifier
 partitions <- c(train=0.7, test=0.2, val=0.1)
 strat <- create_holdout_partition(mymldr, partitions, "iterative")
 #using C5.0 and changing ECC parameters
@@ -176,7 +165,7 @@ test <- predict(model1, strat$test)
 thresholds <- scut_threshold(val, strat$val)
 new.val <- fixed_threshold(val, thresholds)
 new.test <- fixed_threshold(test, thresholds)
-# Evaluate the models
+
 measures <- c("subset-accuracy", "F1", "hamming-loss", "macro-based")
 result <- cbind(
   Test = multilabel_evaluate(strat$tes, test, measures),
@@ -187,7 +176,7 @@ result <- cbind(
 write.csv(result,"my_result_decision_tree.csv")
 
 
-#Naive bayes classifier
+# Naive bayes classifier
 
 partitions <- c(train=0.7, test=0.2, val=0.1)
 strat <- create_holdout_partition(mymldr, partitions, "iterative")
@@ -198,7 +187,7 @@ test <- predict(model1, strat$test)
 thresholds <- scut_threshold(val, strat$val)
 new.val <- fixed_threshold(val, thresholds)
 new.test <- fixed_threshold(test, thresholds)
-# Evaluate the models
+
 measures <- c("subset-accuracy", "F1", "hamming-loss", "macro-based")
 result <- cbind(
   Test = multilabel_evaluate(strat$tes, test, measures),
@@ -207,9 +196,9 @@ result <- cbind(
   ValidationWithThreshold = multilabel_evaluate(strat$val, new.val, measures)
 )
 write.csv(result,"my_result_Naive_bayes.csv");
-#The table shows the multi-label Hamming loss of the classification results.
+# The table shows the multi-label Hamming loss of the classification results.
 #The Hamming Loss ranges from 0 to 1, where lower values indicate better performance. A Hamming Loss of 0 means perfect predictions, while a value of 1 indicates that all labels are incorrectly predicted.
 #The trained model is utilized to predict the class label of unknown genes. We have obtained 3131 genes associated with multiple disease classes.
-#Table 2 lists some of the predicted gene-disease associations along with their supporting PubMed IDs, demonstrating the validity of these associations based on existing literature.
+# Table shows some of the predicted gene-disease associations along with their supporting PubMed IDs, demonstrating the validity of these associations based on existing literature.
 
  
